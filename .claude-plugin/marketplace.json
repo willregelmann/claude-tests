@@ -1,0 +1,11 @@
+{
+  "name": "claude-tests",
+  "owner": { "name": "Will" },
+  "plugins": [
+    {
+      "name": "test",
+      "source": "./",
+      "description": "LLM-as-evaluator test framework — write natural language assertions, an isolated AI agent judges pass/fail with evidence"
+    }
+  ]
+}
