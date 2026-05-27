@@ -10,14 +10,17 @@ An LLM-as-evaluator test framework for Claude Code. Write natural language asser
 
 ### Install the plugin
 
-```bash
-claude plugin add willregelmann/claude-tests
+Add the marketplace, then install the plugin:
+
+```
+/plugin marketplace add willregelmann/claude-tests
+/plugin install test@claude-tests
 ```
 
-Verify it's loaded:
+Verify it's loaded — `/run` should appear in the command list:
 
-```bash
-claude /run
+```
+/plugin
 ```
 
 ## Usage
