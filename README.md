@@ -187,6 +187,8 @@ Summary report displayed to user
 
 The evaluator agent has zero knowledge of how code was implemented. It only sees the test spec. This prevents grading-your-own-homework bias.
 
+For the reasoning behind these choices — the delivery-model tradeoffs, how tool scoping is actually enforced, how deterministic checks work, and what the reliability numbers do and don't prove — see [DESIGN.md](DESIGN.md).
+
 ## Plugin structure
 
 ```
