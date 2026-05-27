@@ -1,7 +1,7 @@
 ---
 description: Run AI-evaluated tests
 argument-hint: [name | --all]
-allowed-tools: Read, Glob, Bash, Agent
+allowed-tools: Read, Glob, Agent
 ---
 
 Run AI-evaluated tests from `./.claude/tests/`.
@@ -21,15 +21,20 @@ Read each file and parse the YAML frontmatter to extract: `name`, `tools`, `asse
 
 If a specific test name was given, find the file whose `name` frontmatter matches. If no match, list the available test names and stop.
 
-**Step 3 — Discover co-located MCP tools:**
+**Step 3 — Select an evaluator profile per test:**
 
-For each test directory, check if a `tools/` subdirectory exists (e.g., `.claude/tests/<name>/tools/`). If it does, glob for executable scripts inside it. Each script is a stdio MCP server. Collect the list of tool scripts (absolute paths) per test — these will be passed to the agent spawn so the evaluator can call them as native `mcp__*` tools without needing `Bash` access.
+The evaluator's tools are fixed by the agent definition it is spawned as (per-spawn tool scoping is not supported — enforcement lives in the agent's own frontmatter). Two profiles exist:
+
+- `test:test-runner` — read-only (`Read`, `Grep`, `Glob`). The default.
+- `test:test-runner-exec` — adds `Bash` for tests that run commands.
+
+Map each test's `tools` frontmatter to a profile: if it includes `Bash`, use `test:test-runner-exec`; otherwise use `test:test-runner`. Only `Read`, `Grep`, `Glob`, and `Bash` are supported — if a test declares any other tool, warn that it is not honored and fall back based on whether `Bash` is present.
 
 **Step 4 — Execute tests:**
 
 If running multiple tests, assemble all agent prompts first, then spawn all agents in a single message (parallel Agent tool calls — do not call them one at a time).
 
-For each test to run, spawn a `test:test-runner` agent (use `subagent_type: "test:test-runner"`). The agent inherits all tools from the parent context (the Agent tool does not support per-invocation tool scoping). If co-located MCP tools were discovered in Step 3, include them in the agent's prompt so the evaluator knows they are available.
+For each test to run, spawn the profile selected in Step 3 (set `subagent_type` accordingly). The evaluator's tools are fixed by that agent definition; nothing is passed to scope them per spawn.
 
 Assemble the agent prompt from the test file:
 

@@ -17,7 +17,7 @@ Add the marketplace, then install the plugin:
 /plugin install test@claude-tests
 ```
 
-Verify it's loaded — `/run` should appear in the command list:
+Verify it's loaded — `/test:run` should appear in the command list:
 
 ```
 /plugin
@@ -52,20 +52,6 @@ curl -s http://localhost:3000/health | tee /tmp/health-check.log
 After evaluation, stop the server and clean up: `kill %1 && rm -f /tmp/health-check.log`
 ```
 
-#### Co-located MCP tools
-
-Test directories can contain a `tools/` subdirectory with stdio MCP servers for deterministic checks:
-
-```
-./.claude/tests/health-check/
-├── test.md
-└── tools/
-    ├── check-status.sh
-    └── validate-response.py
-```
-
-Each script in `tools/` is a stdio MCP server. The `/run` command auto-discovers them and exposes them to the evaluator as native `mcp__*` tools — no `Bash` access needed. This gives deterministic checks a typed interface while keeping the evaluator sandboxed.
-
 Use the `write-test` skill for guided authoring:
 
 > "Write a test for the deploy script"
@@ -74,12 +60,14 @@ Claude will walk you through requirements, schema, assertion quality, and consis
 
 ### Running tests
 
-```bash
+Run from inside a Claude Code session (it's a slash command, not a shell command):
+
+```
 # Run all tests
-claude /run
+/test:run
 
 # Run a specific test by name
-claude /run health-check
+/test:run health-check
 ```
 
 Multiple tests run in parallel. Results are displayed as a summary:
@@ -103,16 +91,23 @@ Failed assertions include evidence and reason.
 | Field | Required | Default | Description |
 |-------|----------|---------|-------------|
 | `name` | Yes | — | Unique test identifier (kebab-case) |
-| `tools` | No | `["Read", "Grep", "Glob"]` | Tools available to the evaluator |
+| `tools` | No | `["Read", "Grep", "Glob"]` | Selects the evaluator profile (see below) |
 | `assertions` | Yes | — | Natural language pass/fail checks |
 
 #### Body
 
-The markdown body is freeform — instructions for the evaluator to follow. Describe what to set up, run, and clean up. The evaluator follows these instructions, then judges each assertion. The body can reference co-located MCP tools from the test's `tools/` directory.
+The markdown body is freeform — instructions for the evaluator to follow. Describe what to set up, run, and clean up. The evaluator follows these instructions, then judges each assertion.
 
-#### Tools
+#### Evaluator profiles
 
-The evaluator agent runs in isolation with only the declared tools. If the test body includes bash commands or assertions need shell commands, include `Bash`.
+The evaluator runs as one of two profiles, with tools enforced by the agent definition (not just advertised):
+
+| `tools` declares | Profile | Can run commands? |
+|---|---|---|
+| omitted, or only `Read`/`Grep`/`Glob` | `test-runner` (read-only) | No |
+| includes `Bash` | `test-runner-exec` | Yes |
+
+Only `Read`, `Grep`, `Glob`, and `Bash` are honored. Use the read-only profile for tests that just inspect files; include `Bash` whenever the body runs anything.
 
 ### Writing good assertions
 
@@ -131,15 +126,16 @@ The evaluator requires evidence for every judgment. Partial compliance is FAIL. 
 ## How it works
 
 ```
-/run happy-path
+/test:run happy-path
   │
   ▼
 commands/run.md (orchestrator)
   │  discovers ./.claude/tests/happy-path/test.md
   │  parses frontmatter + body
+  │  picks evaluator profile from `tools`
   │
   ▼
-agents/test-runner.md (isolated evaluator)
+agents/test-runner[-exec].md (isolated evaluator)
   │  no implementation context
   │  follows instructions → evaluates assertions
   │  returns structured VERDICT with evidence
@@ -158,9 +154,10 @@ test/
 │   ├── plugin.json            # Plugin manifest
 │   └── marketplace.json       # Marketplace metadata
 ├── commands/
-│   └── run.md                 # /run command
+│   └── run.md                 # /test:run command
 ├── agents/
-│   └── test-runner.md         # Isolated evaluator agent
+│   ├── test-runner.md         # Isolated evaluator agent (read-only)
+│   └── test-runner-exec.md    # Isolated evaluator agent (+ Bash)
 └── skills/
     └── write-test/
         └── SKILL.md           # Guided test authoring

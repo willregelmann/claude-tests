@@ -7,6 +7,8 @@ assertions:
   - plugin.json contains a "description" field that is a non-empty string
   - commands/run.md exists
   - agents/test-runner.md exists
+  - agents/test-runner-exec.md exists
+  - Both agent files declare a "tools" field in their YAML frontmatter (test-runner has Read, Grep, Glob; test-runner-exec additionally has Bash)
   - skills/write-test/SKILL.md exists
   - .claude-plugin/marketplace.json exists and is valid JSON containing "name", "owner", and "plugins" fields
   - No other unexpected top-level directories exist besides .claude-plugin, commands, agents, skills, claude, and dotfiles/config

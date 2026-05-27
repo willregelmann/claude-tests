@@ -5,7 +5,7 @@ description: Use when the user asks to "write a test", "add a test case", "creat
 
 # Write a `test.md` Test File
 
-Follow these five steps in order. Do not skip steps or guess requirements.
+Follow these four steps in order. Do not skip steps or guess requirements.
 
 ## Step 1 — Understand What to Test
 
@@ -21,65 +21,23 @@ Push the user toward deterministic checks. If they say "the API returns the righ
 
 If the user's answers are vague, push back. "It should work correctly" is not testable. Ask for specifics.
 
-## Step 2 — Build Co-located Tools for Deterministic Checks
+### Make deterministic checks deterministic
 
-Before writing the test file, take every deterministic check from Step 1 and turn it into a co-located MCP tool. This is the most important step — **deterministic checks should not be left to LLM judgment.**
+The evaluator is an LLM. It's reliable for subjective judgment ("is this a professional summary?") but you should not ask it to *eyeball* a deterministic fact. Instead, have the test body **run a command** that produces the concrete value, then write the assertion against that exact output:
 
-### Why co-located tools matter
+- Don't write: "the response looks like valid JSON with the right items."
+- Do write a body step — `curl -s localhost:3000/items | jq 'length'` — and the assertion "The item count printed by the `jq 'length'` command is exactly 3."
 
-The evaluator agent is an LLM. It's great at subjective judgment ("is this a professional summary?") but unreliable for deterministic checks ("does the JSON response contain exactly 3 items?"). Co-located tools give you:
+The shell command does the deterministic work; the evaluator only reports what it printed. This requires `Bash` in the test's `tools` (see Step 2). Reserve unaided LLM assertions for genuinely subjective things.
 
-- **Deterministic results** — a script returns pass/fail, not an LLM's interpretation
-- **Typed interfaces** — the evaluator calls a named tool with defined parameters, not a freeform bash command
-- **Reproducibility** — the same tool gives the same answer every time
-- **Scoped access** — each tool does one thing with a clear contract
-
-### How to create them
-
-Place tools in `./.claude/tests/<name>/tools/`. Each script is a stdio MCP server — it reads JSON-RPC from stdin and writes JSON-RPC to stdout.
-
-```
-./.claude/tests/health-check/
-├── test.md
-└── tools/
-    ├── check-status.sh        # Hits endpoint, returns status code
-    └── validate-response.py   # Validates JSON schema of response
-```
-
-### Guidelines
-
-- **One tool per concern.** `check-status` and `validate-schema` are separate tools.
-- **Return structured data.** The tool's response should include the evidence — don't just return true/false. Return the actual value so the evaluator can report it.
-- **Make scripts executable.** `chmod +x` each script.
-- **Use any language.** Bash, Python, Node — whatever suits the check. The only requirement is stdin/stdout JSON-RPC.
-- **Reference tools in the test body.** Tell the evaluator which tool to call and what to check. Example: "Use the `check_status` tool to verify the endpoint returns 200."
-
-The `/run` command auto-discovers `tools/` and exposes them to the evaluator as `mcp__*` tools — no configuration needed.
-
-### What to make into a co-located tool
-
-| Check type | Co-located tool? | Example |
-|---|---|---|
-| Exit code / status code | Yes | `check-exit-code.sh` |
-| JSON schema validation | Yes | `validate-response.py` |
-| Row count / record exists | Yes | `check-db.sh` |
-| File exists / has content | Yes | `check-file.sh` |
-| String matching / regex | Yes | `match-output.sh` |
-| HTTP endpoint returns expected data | Yes | `check-endpoint.sh` |
-| "Professional summary" / prose quality | No — LLM assertion | |
-| "Descriptive commit messages" | No — LLM assertion | |
-| "Proper error handling" | No — LLM assertion | |
-
-**Rule of thumb:** If you can write an `if` statement for it, it should be a co-located tool. If it requires reading comprehension, it's an LLM assertion.
-
-## Step 3 — Write the Test File
+## Step 2 — Write the Test File
 
 Create the file at `./.claude/tests/<name>/test.md` using this schema:
 
 ```yaml
 ---
 name: string            # Unique test identifier (required, kebab-case)
-tools:                  # Tools available to the evaluator (optional, defaults to ["Read", "Grep", "Glob"])
+tools:                  # Optional. Selects the evaluator profile (see below).
   - string
 assertions:             # Natural language pass/fail checks (required, list of strings)
   - string
@@ -90,17 +48,24 @@ Describe the process: what to set up, what to run, what to clean up.
 The evaluator follows these instructions, then judges each assertion.
 ```
 
+#### Choosing `tools` (the evaluator profile)
+
+The evaluator runs as one of two fixed profiles, selected by the `tools` you declare:
+
+- **Omit `tools`, or list only `Read`/`Grep`/`Glob`** → read-only evaluator. Use this for tests that only inspect files (docs, structure, static content).
+- **Include `Bash`** → evaluator that can run commands. Use this whenever the body runs anything (servers, curl, scripts, builds).
+
+Only `Read`, `Grep`, `Glob`, and `Bash` are honored — there is no per-tool sandbox beyond these two profiles. If a deterministic check needs to run a command, you must include `Bash`.
+
 ### Writing the test body
 
 The body should tell the evaluator:
 
-1. **What to run** — the command or setup steps
-2. **Which co-located tools to call** — name them explicitly, e.g. "Use the `check_status` tool to verify the endpoint returns 200"
-3. **What to clean up** — teardown steps after evaluation
+1. **What to run** — the command or setup steps (requires `Bash`)
+2. **What to check** — for deterministic facts, write a command that prints the concrete value, then assert against that output
+3. **What to clean up** — teardown steps after evaluation (the evaluator runs cleanup even if an assertion fails)
 
-For assertions backed by co-located tools, write the assertion to match the tool's output. Example: "The `check_status` tool returns HTTP 200 for the /health endpoint" — this is deterministic because the tool does the actual check, and the evaluator just reports what the tool returned.
-
-## Step 4 — Write Good Assertions
+## Step 3 — Write Good Assertions
 
 Each assertion is a natural language statement the evaluator judges as PASS or FAIL. Quality rules:
 
@@ -110,7 +75,7 @@ Each assertion is a natural language statement the evaluator judges as PASS or F
 4. **Test absence explicitly.** Write "No files were committed (create_or_update_file not called)" not "nothing happened."
 5. **Qualify subjective judgments.** Write "Posted ticket note is a professional summary mentioning PR links and the health check feature" not "note is good."
 6. **One check per assertion.** Split "PR title follows format AND body contains summary" into two assertions.
-7. **Back deterministic assertions with co-located tools.** If an assertion checks a concrete value (status code, row count, file existence), there should be a co-located tool for it. The assertion then becomes "The `check_status` tool returns 200" rather than asking the LLM to run curl and interpret the result.
+7. **Back deterministic assertions with command output.** If an assertion checks a concrete value (status code, row count, file existence), have the body run a command that prints it and assert against that output — "The exit code printed by `echo $?` is 0" rather than asking the LLM to judge whether the command "succeeded."
 
 ### How the Evaluator Works
 
@@ -123,15 +88,15 @@ The evaluator is strict:
 
 Write assertions with this strictness in mind. If you write "proper error handling," the evaluator has no standard to judge against. Write "returns HTTP 500 with JSON error body when database is unreachable" instead.
 
-## Step 5 — Verify Consistency
+## Step 4 — Verify Consistency
 
 Before finishing, check every item:
 
-- [ ] Every deterministic check has a co-located tool (not left to LLM judgment)
-- [ ] Every co-located tool referenced in the body exists in `tools/` and is executable
-- [ ] Co-located tools return structured data with evidence, not just true/false
+- [ ] Every deterministic check is backed by a command in the body, not left to LLM eyeballing
+- [ ] `tools` includes `Bash` if (and only if) the body runs any command
 - [ ] LLM assertions are reserved for genuinely subjective judgments
 - [ ] No assertion combines multiple independent checks (split them)
+- [ ] Cleanup/teardown steps are described in the body
 - [ ] `name` is unique across all test files in `./.claude/tests/`
 
 If any check fails, fix the test file before presenting it to the user.

@@ -4,20 +4,21 @@ This is the `test` plugin for Claude Code — an LLM-as-evaluator test framework
 
 ## Architecture
 
-Four files, no build step:
+No build step:
 
-- **`commands/run.md`** — `/run` command. Orchestrates test discovery, parses `./.claude/tests/*/test.md` files, spawns `test-runner` agents (in parallel for multiple tests), collects verdicts, displays summary.
-- **`agents/test-runner.md`** — Isolated evaluator agent. Receives only the test spec (no implementation context). Follows instructions → evaluates assertions with evidence → returns structured VERDICT.
+- **`commands/run.md`** — `/test:run` command. Orchestrates test discovery, parses `./.claude/tests/*/test.md` files, picks an evaluator profile per test from its `tools`, spawns evaluator agents (in parallel for multiple tests), collects verdicts, displays summary.
+- **`agents/test-runner.md`** — Isolated read-only evaluator agent (`tools: Read, Grep, Glob`). Receives only the test spec (no implementation context). Follows instructions → evaluates assertions with evidence → returns structured VERDICT.
+- **`agents/test-runner-exec.md`** — Same evaluator, with `Bash` added (`tools: Read, Grep, Glob, Bash`). Spawned for tests that declare `Bash`.
 - **`skills/write-test/SKILL.md`** — Guided skill for authoring `test.md` files. Walks through understanding requirements, schema, assertion quality rules, and consistency verification.
 - **`.claude-plugin/plugin.json`** — Plugin manifest (name, description, version).
 
 ## Key Conventions
 
 - Test files live in the consuming project at `./.claude/tests/<name>/test.md` with YAML frontmatter (`name`, `tools`, `assertions`) and a freeform markdown body.
-- The test-runner agent defaults to read-only tools `["Read", "Grep", "Glob"]`. Each test file can override via `tools` frontmatter.
+- Two evaluator profiles, enforced by agent-definition frontmatter (per-spawn tool scoping is not supported by the Agent tool): `test-runner` (`Read, Grep, Glob`) and `test-runner-exec` (adds `Bash`). A test's `tools` frontmatter selects the profile — if it includes `Bash`, `/test:run` spawns `test-runner-exec`; otherwise `test-runner`. Only those four tools are honored.
 - Assertions are natural language pass/fail — no scoring, weights, or severity levels.
 - Tests are independent — no ordering or dependencies between them.
-- Test directories can contain a `tools/` subdirectory with stdio MCP servers for deterministic checks. The `/run` command auto-discovers them and exposes them to the evaluator as native `mcp__*` tools.
+- Deterministic checks are done by running a command in the test body (requires `Bash`) and asserting against its printed output.
 
 ## Publishing
 
