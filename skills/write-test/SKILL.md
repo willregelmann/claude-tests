@@ -1,25 +1,23 @@
 ---
 name: write-test
-description: Use when the user asks to "write a test", "add a test case", "create a test for X", "new test file", "add a test.md", or wants to create an AI-evaluated test for the test plugin. Guides through understanding requirements, writing the test file with correct schema, crafting quality assertions, and verifying consistency.
+description: Use when the user asks to "write a test", "add a test case", "create a test for X", "new test file", "add a test.md", or otherwise wants to create an AI-evaluated test for the test plugin. Infers what to test from the codebase, adapts the closest example, writes quality assertions, and runs the test to confirm it works.
 ---
 
 # Write a `test.md` Test File
 
-Follow these four steps in order. Do not skip steps or guess requirements.
+Goal: produce a high-quality, **runnable** test with minimal back-and-forth. Infer what you can from the repo, confirm only what you must, then prove it runs before handing it over.
 
-## Step 1 — Understand What to Test
+## Step 1 — Understand what to test (infer first, ask least)
 
-Ask the user these questions. Do not proceed until you have answers:
+Work out these five things. **Infer them from the codebase and the developer's request before asking** — read the command, script, or file under test, the code around it, and any relevant docs:
 
-1. **What command or workflow is being tested?** (the exact command to run)
-2. **What does success look like?** (expected outputs, side effects, state changes)
-3. **What does failure look like?** (what should NOT happen)
-4. **Which checks can be deterministic?** (exit codes, HTTP status codes, JSON schema validation, file existence, row counts, string matching — anything with a concrete expected value)
-5. **Which checks need LLM judgment?** (prose quality, code style, "professional summary," subjective assessments)
+1. **What command or workflow** is being tested
+2. **What success looks like** — outputs, side effects, state changes
+3. **What failure looks like** — what should NOT happen
+4. **Which checks are deterministic** — exit codes, HTTP status, counts, exact strings, file existence
+5. **Which checks need genuine LLM judgment** — prose quality, "professional summary," subjective calls
 
-Push the user toward deterministic checks. If they say "the API returns the right data," ask: what fields? what values? That's a deterministic check, not an LLM judgment. Reserve LLM assertions for things that genuinely require interpretation.
-
-If the user's answers are vague, push back. "It should work correctly" is not testable. Ask for specifics.
+Then **draft first and confirm**, rather than running a quiz: "Based on `deploy.sh`, I'll test that it exits 0 on a clean deploy, writes `dist/`, and prints no errors — anything to add or correct?" Only ask the developer about things you genuinely can't determine from the repo or where intent is ambiguous. Push back only on real vagueness — "it should work" isn't testable; "the build produces `dist/app.js`" is.
 
 ### Make deterministic checks deterministic
 
@@ -28,9 +26,22 @@ The evaluator is an LLM. It's reliable for subjective judgment ("is this a profe
 - Don't write: "the response looks like valid JSON with the right items."
 - Do write a body step — `curl -s localhost:3000/items | jq 'length'` — and the assertion "The item count printed by the `jq 'length'` command is exactly 3."
 
-The shell command does the deterministic work; the evaluator only reports what it printed. This requires `Bash` in the test's `tools` (see Step 2). Reserve unaided LLM assertions for genuinely subjective things.
+The shell command does the deterministic work; the evaluator only reports what it printed. This requires `Bash` in the test's `tools` (see Step 3). Reserve unaided LLM assertions for genuinely subjective things.
 
-## Step 2 — Write the Test File
+## Step 2 — Start from the closest example
+
+The repo ships templates in [`examples/`](../../examples/). Adapt the nearest one instead of authoring from a blank file:
+
+| If the test… | Start from |
+|---|---|
+| only inspects files (docs, config, structure) | `examples/static-docs` |
+| runs a command and checks its exit code / output | `examples/cli-exit-code` |
+| needs a service or process running | `examples/http-health-check` |
+| judges something subjective | `examples/commit-quality` |
+
+Copy its shape, then replace the command, assertions, and any fixtures with the real target.
+
+## Step 3 — Write the test file
 
 Create the file at `./.claude/tests/<name>/test.md` using this schema:
 
@@ -65,7 +76,9 @@ The body should tell the evaluator:
 2. **What to check** — for deterministic facts, write a command that prints the concrete value, then assert against that output
 3. **What to clean up** — teardown steps after evaluation (the evaluator runs cleanup even if an assertion fails)
 
-## Step 3 — Write Good Assertions
+If the test needs helper scripts or fixtures, put them in the test's own directory; the evaluator is told that directory and resolves relative paths against it.
+
+## Step 4 — Write good assertions
 
 Each assertion is a natural language statement the evaluator judges as PASS or FAIL. Quality rules:
 
@@ -88,15 +101,20 @@ The evaluator is strict:
 
 Write assertions with this strictness in mind. If you write "proper error handling," the evaluator has no standard to judge against. Write "returns HTTP 500 with JSON error body when database is unreachable" instead.
 
-## Step 4 — Verify Consistency
+## Step 5 — Run it and confirm
 
-Before finishing, check every item:
+Don't hand over an unproven test. Run it:
 
-- [ ] Every deterministic check is backed by a command in the body, not left to LLM eyeballing
-- [ ] `tools` includes `Bash` if (and only if) the body runs any command
-- [ ] LLM assertions are reserved for genuinely subjective judgments
-- [ ] No assertion combines multiple independent checks (split them)
-- [ ] Cleanup/teardown steps are described in the body
-- [ ] `name` is unique across all test files in `./.claude/tests/`
+- In a session: `/test:run <name>`
+- Headless: `bin/run-tests.py <name>`
 
-If any check fails, fix the test file before presenting it to the user.
+Confirm it behaves: a test of working code should **PASS**, and each assertion's evidence should be what you expected to see. If it fails unexpectedly, the cause is usually one of — a deterministic check left to eyeballing, a missing `Bash` in `tools`, a fixture path the evaluator couldn't resolve, or an assertion that bundled two checks. Fix and re-run. Where practical, sanity-check that the test can also **FAIL** by pointing it at broken input — a test that can't fail isn't testing anything.
+
+Final checklist before you call it done:
+
+- [ ] Every deterministic check is backed by a command, not LLM eyeballing
+- [ ] `tools` includes `Bash` if (and only if) the body runs a command
+- [ ] Subjective assertions are qualified; one check per assertion
+- [ ] Cleanup/teardown is described in the body
+- [ ] `name` is unique across `./.claude/tests/`
+- [ ] The test was actually run and behaved as intended
