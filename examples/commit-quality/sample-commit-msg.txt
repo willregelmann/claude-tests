@@ -1,0 +1,11 @@
+Add retry with exponential backoff to the upload client
+
+Transient 503s from the storage backend were surfacing as hard failures.
+The client now retries idempotent uploads up to 3 times with backoff
+(250ms, 500ms, 1s) and surfaces the final error if all attempts fail.
+
+- Wraps PutObject in retryWithBackoff
+- Adds RETRY_MAX and RETRY_BASE_MS env knobs (defaults 3 / 250)
+- Covered by upload_retry_test.go
+
+Closes #482

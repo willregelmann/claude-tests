@@ -36,10 +36,12 @@ If running multiple tests, assemble all agent prompts first, then spawn all agen
 
 For each test to run, spawn the profile selected in Step 3 (set `subagent_type` accordingly). The evaluator's tools are fixed by that agent definition; nothing is passed to scope them per spawn.
 
-Assemble the agent prompt from the test file:
+Assemble the agent prompt from the test file. Include the test's directory so the evaluator can locate any co-located scripts or fixtures (its working directory is the project root, not the test directory):
 
 ```
 Test: <name>
+Test directory: .claude/tests/<name>
+Files referenced by this test live in its test directory unless stated otherwise; resolve relative paths against it.
 
 Assertions:
 1. <first assertion>

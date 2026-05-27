@@ -98,7 +98,7 @@ def discover_tests(name_filter):
         fm, body = parse_test_file(path)
         if name_filter and fm["name"] != name_filter:
             continue
-        tests.append((fm, body))
+        tests.append((fm, body, path.parent))
     return tests
 
 
@@ -111,14 +111,18 @@ def evaluator_system_prompt(use_bash: bool) -> str:
     return body.strip()
 
 
-def run_one(fm, body, model):
+def run_one(fm, body, test_dir, model):
     use_bash = "Bash" in fm["tools"]
     tools = EXEC_TOOLS if use_bash else READONLY_TOOLS
     system = evaluator_system_prompt(use_bash)
 
     numbered = "\n".join(f"{i}. {a}" for i, a in enumerate(fm["assertions"], 1))
     prompt = (
-        f"Test: {fm['name']}\n\n"
+        f"Test: {fm['name']}\n"
+        f"Test directory: {test_dir}\n"
+        "Files referenced by this test (scripts, fixtures) live in its test "
+        "directory unless stated otherwise; resolve relative paths against it. "
+        "Your working directory is the project root.\n\n"
         f"Assertions:\n{numbered}\n\n"
         f"{body}\n\n"
         "Evaluate every assertion and return the structured verdict."
@@ -230,7 +234,7 @@ def main():
         print(f"No test files found{target} in ./.claude/tests/", file=sys.stderr)
         return 2
 
-    verdicts = [run_one(fm, body, args.model) for fm, body in tests]
+    verdicts = [run_one(fm, body, test_dir, args.model) for fm, body, test_dir in tests]
 
     if args.format == "json":
         print(json.dumps(verdicts, indent=2))

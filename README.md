@@ -27,6 +27,8 @@ Verify it's loaded — `/test:run` should appear in the command list:
 
 ## Usage
 
+> Looking for working templates? See [`examples/`](examples/) — read-only and `Bash` profiles, a server lifecycle, a deterministic CLI check, and a subjective judgment, each ready to copy into `./.claude/tests/`.
+
 ### Writing tests
 
 Tests live in your project at `./.claude/tests/<name>/test.md`. Each test gets its own directory with a `test.md` file containing YAML frontmatter and a freeform markdown body:
@@ -181,8 +183,9 @@ test/
 ├── skills/
 │   └── write-test/
 │       └── SKILL.md           # Guided test authoring
-└── bin/
-    └── run-tests.py           # Headless runner for CI (JUnit + exit codes)
+├── bin/
+│   └── run-tests.py           # Headless runner for CI (JUnit + exit codes)
+└── examples/                  # Copy-paste test templates
 ```
 
 ## License
