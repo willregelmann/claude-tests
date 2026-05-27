@@ -43,7 +43,7 @@ ASSERTION_SCHEMA = {
 
 
 def evaluate_case(case, model):
-    system = evaluator_system_prompt(use_bash=False)
+    system = evaluator_system_prompt(["Read", "Grep", "Glob"])
     prompt = (
         "Artifact under test:\n"
         "------------------------------------------------------------\n"

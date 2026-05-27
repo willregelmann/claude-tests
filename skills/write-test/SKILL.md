@@ -66,7 +66,9 @@ The evaluator runs as one of two fixed profiles, selected by the `tools` you dec
 - **Omit `tools`, or list only `Read`/`Grep`/`Glob`** → read-only evaluator. Use this for tests that only inspect files (docs, structure, static content).
 - **Include `Bash`** → evaluator that can run commands. Use this whenever the body runs anything (servers, curl, scripts, builds).
 
-Only `Read`, `Grep`, `Glob`, and `Bash` are honored — there is no per-tool sandbox beyond these two profiles. If a deterministic check needs to run a command, you must include `Bash`.
+Under the interactive `/test:run`, only `Read`, `Grep`, `Glob`, and `Bash` are honored — there is no per-tool sandbox beyond these two profiles. If a deterministic check needs to run a command, you must include `Bash`.
+
+The **headless runner** (`bin/run-tests.py`, used in CI) is not limited to the two profiles: it grants the read-only baseline plus whatever you declare, so a test can list arbitrary tools — e.g. `tools: ["WebFetch"]` to let the evaluator read a cited source, or an `mcp__*` tool. Such a test runs fully only headless; under interactive `/test:run` it falls back to the nearest profile and assertions needing the extra tool will FAIL. Prefer deterministic local evidence (`Bash` + a command) where you can; reach for network/MCP tools only when the assertion genuinely needs them.
 
 ### Writing the test body
 

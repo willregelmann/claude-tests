@@ -18,7 +18,8 @@ No build step:
 ## Key Conventions
 
 - Test files live in the consuming project at `./.claude/tests/<name>/test.md` with YAML frontmatter (`name`, `tools`, `assertions`) and a freeform markdown body.
-- Two evaluator profiles, enforced by agent-definition frontmatter (per-spawn tool scoping is not supported by the Agent tool): `test-runner` (`Read, Grep, Glob`) and `test-runner-exec` (adds `Bash`). A test's `tools` frontmatter selects the profile — if it includes `Bash`, `/test:run` spawns `test-runner-exec`; otherwise `test-runner`. Only those four tools are honored.
+- Two evaluator profiles, enforced by agent-definition frontmatter (per-spawn tool scoping is not supported by the Agent tool): `test-runner` (`Read, Grep, Glob`) and `test-runner-exec` (adds `Bash`). A test's `tools` frontmatter selects the profile — if it includes `Bash`, `/test:run` spawns `test-runner-exec`; otherwise `test-runner`. Only those four tools are honored in the interactive path.
+- The headless runner (`bin/run-tests.py`) is not bound by the agent profiles: it grants the read-only baseline (`Read, Grep, Glob`) plus whatever a test's `tools` declares, passing them through to `claude -p --allowedTools`. This lets headless tests use arbitrary tools (`WebFetch`, `WebSearch`, `mcp__*`, …); the evaluator system prompt is generated from those granted tools so it states them accurately. A test needing tools beyond the four interactive ones is therefore headless-only.
 - Assertions are natural language pass/fail — no scoring, weights, or severity levels.
 - Tests are independent — no ordering or dependencies between them.
 - Deterministic checks are done by running a command in the test body (requires `Bash`) and asserting against its printed output.
