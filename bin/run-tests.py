@@ -21,14 +21,12 @@ Usage:
 
 import argparse
 import json
-import subprocess
 import sys
-import time
 from pathlib import Path
 from xml.etree import ElementTree as ET
 from xml.dom import minidom
 
-PLUGIN_ROOT = Path(__file__).resolve().parent.parent
+from claude_eval import call_evaluator, evaluator_system_prompt
 
 # Verdict schema the evaluator must return as structured output.
 VERDICT_SCHEMA = {
@@ -102,15 +100,6 @@ def discover_tests(name_filter):
     return tests
 
 
-def evaluator_system_prompt(use_bash: bool) -> str:
-    """Read the plugin's agent file body (sans frontmatter) as the evaluator
-    system prompt, so headless matches the interactive agent."""
-    agent_file = "test-runner-exec.md" if use_bash else "test-runner.md"
-    text = (PLUGIN_ROOT / "agents" / agent_file).read_text()
-    _, _, body = text.split("---", 2)
-    return body.strip()
-
-
 def run_one(fm, body, test_dir, model):
     use_bash = "Bash" in fm["tools"]
     tools = EXEC_TOOLS if use_bash else READONLY_TOOLS
@@ -128,32 +117,9 @@ def run_one(fm, body, test_dir, model):
         "Evaluate every assertion and return the structured verdict."
     )
 
-    cmd = [
-        "claude", "-p", prompt,
-        "--append-system-prompt", system,
-        "--allowedTools", *tools,
-        "--permission-mode", "acceptEdits",
-        "--output-format", "json",
-        "--json-schema", json.dumps(VERDICT_SCHEMA),
-    ]
-    if model:
-        cmd += ["--model", model]
-
-    start = time.time()
-    proc = subprocess.run(cmd, capture_output=True, text=True)
-    duration = time.time() - start
-
-    if proc.returncode != 0:
-        return _error_verdict(fm, duration, proc.stderr.strip() or "claude exited non-zero")
-
-    try:
-        outer = json.loads(proc.stdout)
-        verdict = outer.get("structured_output")
-        if verdict is None:
-            # Fallback: some versions nest it; otherwise treat as error.
-            return _error_verdict(fm, duration, "no structured_output in response")
-    except json.JSONDecodeError as e:
-        return _error_verdict(fm, duration, f"unparseable response: {e}")
+    verdict, duration, error = call_evaluator(system, prompt, tools, model, VERDICT_SCHEMA)
+    if error is not None:
+        return _error_verdict(fm, duration, error)
 
     verdict["name"] = fm["name"]
     verdict["duration"] = duration

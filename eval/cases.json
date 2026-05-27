@@ -1,0 +1,75 @@
+{
+  "_comment": "Labeled calibration set for the LLM evaluator. Each case gives the evaluator a self-contained artifact and a single assertion, with the known-correct verdict. The artifact is passed inline so the environment is fully deterministic — any run-to-run variance is the judge's, which is exactly what we measure. Cases are tagged by kind: 'deterministic' should be rock-solid; 'subjective' needs judgment; 'borderline' is intentionally near the decision boundary to surface flakiness.",
+  "cases": [
+    {
+      "name": "det-contains-pass",
+      "kind": "deterministic",
+      "assertion": "The output contains a line where status equals ok",
+      "expected": "PASS",
+      "artifact": "starting service...\nstatus: ok\nlistening on :8080"
+    },
+    {
+      "name": "det-exit-fail",
+      "kind": "deterministic",
+      "assertion": "The exit code reported in the log is 0",
+      "expected": "FAIL",
+      "artifact": "running migration 0042...\nERROR: relation \"users\" already exists\nexit code: 1"
+    },
+    {
+      "name": "det-count-pass",
+      "kind": "deterministic",
+      "assertion": "Exactly three items are listed under dependencies",
+      "expected": "PASS",
+      "artifact": "dependencies:\n  - requests\n  - click\n  - rich\ndev-dependencies:\n  - pytest"
+    },
+    {
+      "name": "det-count-fail",
+      "kind": "deterministic",
+      "assertion": "Exactly three items are listed under dependencies",
+      "expected": "FAIL",
+      "artifact": "dependencies:\n  - requests\n  - click\ndev-dependencies:\n  - pytest"
+    },
+    {
+      "name": "subj-commit-pass",
+      "kind": "subjective",
+      "assertion": "The commit message body explains why the change was made, not only what changed",
+      "expected": "PASS",
+      "artifact": "Cap upload retries at 3\n\nUnbounded retries were holding connections open during backend\noutages and exhausting the pool. Capping at 3 with backoff frees\nconnections while still riding out brief blips."
+    },
+    {
+      "name": "subj-commit-fail",
+      "kind": "subjective",
+      "assertion": "The commit message body explains why the change was made, not only what changed",
+      "expected": "FAIL",
+      "artifact": "fix stuff\n\nchanged the retry loop and updated a few things"
+    },
+    {
+      "name": "border-partial-sections",
+      "kind": "borderline",
+      "assertion": "All three required sections are present: Installation, Usage, and License",
+      "expected": "FAIL",
+      "artifact": "# My Tool\n\n## Installation\nrun npm install\n\n## Usage\nrun the thing\n"
+    },
+    {
+      "name": "border-todo-present",
+      "kind": "borderline",
+      "assertion": "There are no TODO or FIXME placeholders in the code",
+      "expected": "FAIL",
+      "artifact": "def charge(amount):\n    # TODO: handle declined cards\n    return gateway.charge(amount)"
+    },
+    {
+      "name": "border-exact-body",
+      "kind": "borderline",
+      "assertion": "The response body is exactly {\"status\":\"ok\"} with no extra fields",
+      "expected": "PASS",
+      "artifact": "{ \"status\": \"ok\" }"
+    },
+    {
+      "name": "border-descriptive-name",
+      "kind": "borderline",
+      "assertion": "The function name clearly describes what the function does",
+      "expected": "FAIL",
+      "artifact": "def proc(d):\n    return [x * 2 for x in d if x > 0]"
+    }
+  ]
+}

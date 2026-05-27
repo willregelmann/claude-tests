@@ -11,6 +11,8 @@ No build step:
 - **`agents/test-runner-exec.md`** — Same evaluator, with `Bash` added (`tools: Read, Grep, Glob, Bash`). Spawned for tests that declare `Bash`.
 - **`skills/write-test/SKILL.md`** — Guided skill for authoring `test.md` files. Walks through understanding requirements, schema, assertion quality rules, and consistency verification.
 - **`bin/run-tests.py`** — Headless runner for CI. Discovers the same `test.md` files, spawns one isolated `claude -p` evaluator per test (sourcing the evaluator system prompt from the `agents/` files so headless matches interactive), emits a summary + optional JUnit XML, and exits non-zero on failure. Stdlib-only Python.
+- **`bin/claude_eval.py`** — Shared module wrapping the isolated `claude -p` evaluator call. Used by both the test runner and the reliability harness so they exercise the identical evaluator.
+- **`bin/eval-reliability.py`** — Reliability harness. Runs a labeled calibration set (`eval/cases.json`) through the evaluator N times and reports accuracy, run-to-run agreement, and majority-vote lift. Quantifies the framework's core assumption (an LLM can judge assertions reliably).
 - **`.claude-plugin/plugin.json`** — Plugin manifest (name, description, version).
 
 ## Key Conventions

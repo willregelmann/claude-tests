@@ -1,8 +1,16 @@
 # test
 
 [![tests](https://github.com/willregelmann/claude-tests/actions/workflows/tests.yml/badge.svg)](https://github.com/willregelmann/claude-tests/actions/workflows/tests.yml)
+[![release](https://img.shields.io/github/v/release/willregelmann/claude-tests)](https://github.com/willregelmann/claude-tests/releases)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 An LLM-as-evaluator test framework for Claude Code. Write natural language assertions, and an isolated AI agent judges pass/fail with evidence — no shared context with the implementation session.
+
+**The problem.** When the agent that wrote the code also grades it, you get graded-your-own-homework bias. Every test here runs in a fresh subagent with *no* memory of the implementation — the judge sees only the spec and the observable evidence.
+
+**Does an LLM judge reliably?** Measured, not assumed: on a [labeled calibration set](eval/), both Sonnet 4.6 and Haiku 4.5 reached **100% accuracy and 100% run-to-run agreement** — and the harness stays in the repo to catch any regression.
+
+Runs interactively (`/test:run`) with zero extra setup, or [headlessly in CI](#running-in-ci) with JUnit output and exit codes.
 
 ## Installation
 
@@ -106,6 +114,17 @@ A ready-to-use GitHub Actions workflow lives at [`.github/workflows/tests.yml`](
 
 > **Note:** evaluators are LLMs, so verdicts can vary run to run. Treat this as a semantic smoke test, not a deterministic unit-test replacement — keep deterministic checks backed by commands whose exact output the evaluator reports.
 
+### How reliable is the evaluator?
+
+That caveat is measured, not hand-waved. [`eval/`](eval/) holds a labeled calibration set and a harness that runs each case through the same evaluator N times and reports accuracy, run-to-run agreement, and the lift from majority voting:
+
+```bash
+bin/eval-reliability.py                 # 5 runs/case across the calibration set
+bin/eval-reliability.py --min-accuracy 0.9   # CI gate: exit 1 if majority accuracy drops
+```
+
+See [`eval/README.md`](eval/README.md) for methodology and the latest numbers. The short version: on the current calibration set, both Sonnet and Haiku scored **100% accuracy and 100% run-to-run agreement** — including the borderline cases, so there was no flakiness for voting to fix. The harness exists to keep that honest: it re-validates the premise and would catch a regression from a prompt change, a model swap, or a harder class of assertion.
+
 ### Test file reference
 
 #### Frontmatter fields
@@ -184,8 +203,11 @@ test/
 │   └── write-test/
 │       └── SKILL.md           # Guided test authoring
 ├── bin/
-│   └── run-tests.py           # Headless runner for CI (JUnit + exit codes)
-└── examples/                  # Copy-paste test templates
+│   ├── run-tests.py           # Headless runner for CI (JUnit + exit codes)
+│   ├── eval-reliability.py    # Measures evaluator accuracy/agreement
+│   └── claude_eval.py         # Shared isolated-evaluator call
+├── examples/                  # Copy-paste test templates
+└── eval/                      # Evaluator reliability harness + calibration set
 ```
 
 ## License
