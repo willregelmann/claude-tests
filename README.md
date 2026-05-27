@@ -148,7 +148,9 @@ The evaluator runs as one of two profiles, with tools enforced by the agent defi
 | omitted, or only `Read`/`Grep`/`Glob` | `test-runner` (read-only) | No |
 | includes `Bash` | `test-runner-exec` | Yes |
 
-Only `Read`, `Grep`, `Glob`, and `Bash` are honored. Use the read-only profile for tests that just inspect files; include `Bash` whenever the body runs anything.
+In the interactive `/test:run` path these two profiles are the only options — the Agent tool fixes a subagent's tools by its definition, so `Read`, `Grep`, `Glob`, and `Bash` are the honored set. Use the read-only profile for tests that just inspect files; include `Bash` whenever the body runs anything.
+
+**Headless runner — arbitrary tools.** `bin/run-tests.py` passes a test's declared `tools` straight through to `claude -p --allowedTools`, so headless evaluators can be granted any tool a test needs beyond the baseline — e.g. `WebFetch`, `WebSearch`, or `mcp__*` tools — on top of the always-present read-only `Read`/`Grep`/`Glob`. (Tools beyond `Read`/`Grep`/`Glob`/`Bash` are honored only by the headless runner; under interactive `/test:run` such a test falls back to the nearest profile, so assertions needing the extra tool will FAIL there.)
 
 ### Writing good assertions
 

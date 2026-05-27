@@ -50,8 +50,12 @@ VERDICT_SCHEMA = {
     "required": ["result", "assertions"],
 }
 
-READONLY_TOOLS = ["Read", "Grep", "Glob"]
-EXEC_TOOLS = ["Read", "Grep", "Glob", "Bash"]
+# Every evaluator gets the read-only baseline; a test's `tools` frontmatter adds
+# any further capabilities it needs (Bash, WebFetch, WebSearch, mcp__* tools, …).
+# Unlike the interactive /test:run path — whose subagent tools are fixed by the
+# agent definitions — the headless runner can grant arbitrary tools per test,
+# because it passes them straight through to `claude -p --allowedTools`.
+BASE_TOOLS = ["Read", "Grep", "Glob"]
 
 
 def parse_test_file(path: Path):
@@ -101,9 +105,9 @@ def discover_tests(name_filter):
 
 
 def run_one(fm, body, test_dir, model):
-    use_bash = "Bash" in fm["tools"]
-    tools = EXEC_TOOLS if use_bash else READONLY_TOOLS
-    system = evaluator_system_prompt(use_bash)
+    # Read-only baseline plus whatever the test declares, de-duplicated.
+    tools = list(dict.fromkeys(BASE_TOOLS + (fm["tools"] or [])))
+    system = evaluator_system_prompt(tools)
 
     numbered = "\n".join(f"{i}. {a}" for i, a in enumerate(fm["assertions"], 1))
     prompt = (

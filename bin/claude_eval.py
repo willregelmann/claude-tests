@@ -13,13 +13,46 @@ from pathlib import Path
 PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 
 
-def evaluator_system_prompt(use_bash: bool) -> str:
-    """Read the plugin's agent file body (sans frontmatter) as the evaluator
-    system prompt, so headless matches the interactive agent."""
-    agent_file = "test-runner-exec.md" if use_bash else "test-runner.md"
-    text = (PLUGIN_ROOT / "agents" / agent_file).read_text()
+def evaluator_system_prompt(tools) -> str:
+    """Build the evaluator system prompt for an arbitrary granted tool set.
+
+    The shared evaluator instructions (Process, assertion rules, output format)
+    are reused verbatim from the test-runner agent file so headless stays
+    aligned with the interactive agent; only the tools paragraph is generated
+    dynamically, so the evaluator is told accurately which tools it may use —
+    whether that is the read-only baseline, +Bash, or WebFetch/WebSearch/MCP
+    tools a test declares.
+
+    `tools` may be a list of tool names or (legacy) a bool meaning "use Bash".
+    """
+    if isinstance(tools, bool):  # back-compat with the old use_bash signature
+        tools = ["Read", "Grep", "Glob", "Bash"] if tools else ["Read", "Grep", "Glob"]
+    tools = list(tools)
+
+    # Reuse everything from "**Process:**" onward from the canonical agent file.
+    text = (PLUGIN_ROOT / "agents" / "test-runner.md").read_text()
     _, _, body = text.split("---", 2)
-    return body.strip()
+    shared = "**Process:**" + body.split("**Process:**", 1)[1]
+
+    intro = (
+        "You are an unbiased test evaluator. You have no knowledge of how the "
+        "code under test was implemented. You only know what the test file "
+        "tells you."
+    )
+    tool_list = ", ".join(f"`{t}`" for t in tools)
+    tools_para = (
+        f"You have been granted exactly these tools: {tool_list}. Use them only "
+        "as the test body requires, to gather the evidence each assertion needs. "
+        "If an assertion requires a capability you have not been granted, judge "
+        "that assertion FAIL with that as the reason."
+    )
+    if "Bash" in tools:
+        tools_para += (
+            " Run only the commands the test body instructs, and always perform "
+            "any cleanup the test body specifies — even if an assertion fails "
+            "partway through."
+        )
+    return f"{intro}\n\n{tools_para}\n\n{shared}".strip()
 
 
 def call_evaluator(system_prompt, user_prompt, tools, model, schema):
