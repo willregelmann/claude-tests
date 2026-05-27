@@ -1,0 +1,40 @@
+name: tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Run AI-evaluated tests
+        env:
+          # Set this repo secret to a token from `claude setup-token`
+          # (or use ANTHROPIC_API_KEY). Without it, the suite is skipped
+          # so the workflow stays green on forks / unconfigured repos.
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          if [ -z "$CLAUDE_CODE_OAUTH_TOKEN" ]; then
+            echo "::notice::CLAUDE_CODE_OAUTH_TOKEN not set — skipping AI-evaluated tests."
+            exit 0
+          fi
+          python3 bin/run-tests.py --junit results.xml --model sonnet
+
+      - name: Upload JUnit results
+        if: always() && hashFiles('results.xml') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-results
+          path: results.xml

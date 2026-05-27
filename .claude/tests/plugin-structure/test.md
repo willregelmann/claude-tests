@@ -11,7 +11,7 @@ assertions:
   - Both agent files declare a "tools" field in their YAML frontmatter (test-runner has Read, Grep, Glob; test-runner-exec additionally has Bash)
   - skills/write-test/SKILL.md exists
   - .claude-plugin/marketplace.json exists and is valid JSON containing "name", "owner", and "plugins" fields
-  - No other unexpected top-level directories exist besides .claude-plugin, commands, agents, skills, claude, and dotfiles/config
+  - No other unexpected top-level directories exist besides .claude-plugin, commands, agents, skills, bin, claude, and dotfiles/config
 ---
 
 Verify the plugin has the expected file structure and valid manifest.

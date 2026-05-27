@@ -1,5 +1,7 @@
 # test
 
+[![tests](https://github.com/willregelmann/claude-tests/actions/workflows/tests.yml/badge.svg)](https://github.com/willregelmann/claude-tests/actions/workflows/tests.yml)
+
 An LLM-as-evaluator test framework for Claude Code. Write natural language assertions, and an isolated AI agent judges pass/fail with evidence — no shared context with the implementation session.
 
 ## Installation
@@ -84,6 +86,24 @@ Total: 1/2 passed
 
 Failed assertions include evidence and reason.
 
+### Running in CI
+
+The same tests run headlessly via `bin/run-tests.py` — no Claude Code session required. It spawns one isolated `claude -p` evaluator per test, prints the summary, optionally writes JUnit XML, and exits non-zero if any test fails:
+
+```bash
+# all tests; write JUnit for CI to ingest
+bin/run-tests.py --junit results.xml
+
+# one test, JSON to stdout, choose the evaluator model
+bin/run-tests.py health-check --format json --model sonnet
+```
+
+Requires Python 3 and the `claude` CLI on `PATH`. Authentication reuses whatever `claude` is logged into; in CI, set `CLAUDE_CODE_OAUTH_TOKEN` (from `claude setup-token`) or `ANTHROPIC_API_KEY`.
+
+A ready-to-use GitHub Actions workflow lives at [`.github/workflows/tests.yml`](.github/workflows/tests.yml). Add a `CLAUDE_CODE_OAUTH_TOKEN` repo secret to enable it; without the secret it skips (so the workflow stays green on forks).
+
+> **Note:** evaluators are LLMs, so verdicts can vary run to run. Treat this as a semantic smoke test, not a deterministic unit-test replacement — keep deterministic checks backed by commands whose exact output the evaluator reports.
+
 ### Test file reference
 
 #### Frontmatter fields
@@ -158,9 +178,11 @@ test/
 ├── agents/
 │   ├── test-runner.md         # Isolated evaluator agent (read-only)
 │   └── test-runner-exec.md    # Isolated evaluator agent (+ Bash)
-└── skills/
-    └── write-test/
-        └── SKILL.md           # Guided test authoring
+├── skills/
+│   └── write-test/
+│       └── SKILL.md           # Guided test authoring
+└── bin/
+    └── run-tests.py           # Headless runner for CI (JUnit + exit codes)
 ```
 
 ## License
